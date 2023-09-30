@@ -1,0 +1,62 @@
+clc
+clear all
+
+a = imread('cameraman.tif'); % Reading the image
+a = im2double(a); % Normalizing the intensity values to lie between 0 and 1
+
+ref = a;
+add_noise = imnoise(a, 'gaussian', 0, 0.01); % Adding Gaussian noise with mean 0 and variance 0.01
+timestep = 0.2; % Timestep size used in numerical approximation
+Niter = 60; % Number of iterations
+
+% Calculate the diffusion tensor
+tensor = calculateDiffusionTensor(add_noise);
+
+% Implement edge-enhancing diffusion
+b = eed(add_noise, ref, tensor, timestep, Niter);
+
+% Display the original and enhanced images by eed
+figure;
+subplot(1, 2, 1);
+imshow(add_noise);
+title('Noisy Image');
+subplot(1, 2, 2);
+imshow(b);
+title('Enhanced Image by eed');
+
+
+
+% Define the edge-enhancing diffusion function
+function result_image = eed(f, ref, tensor, dt, niter)
+    result_image= f; % Initialize the result with the noisy image
+    
+    for i = 1:niter
+        % Calculate gradients
+        [Dx, Dy] = gradient(result_image);
+        
+      
+        Gx = tensor(:, :, 1, 1) .* Dx + tensor(:, :, 1, 2) .* Dy;
+        Gy = tensor(:, :, 2, 1) .* Dx + tensor(:, :, 2, 2) .* Dy;
+        
+        % Calculate divergence of the diffusion tensor
+        divG = divergence(Gx, Gy);
+        
+        % Update the image using the edge-enhancing diffusion equation
+        result_image = result_image + dt * (divG - result_image + ref);
+    end
+end
+
+
+% Calculate the diffusion tensor
+function tensor = calculateDiffusionTensor(image)
+    [Ix, Iy] = gradient(image);
+    tensor = zeros(size(image, 1), size(image, 2), 2, 2);
+    
+    for i = 1:size(image, 1)
+        for j = 1:size(image, 2)
+            % Calculate the normalized diffusion tensor
+            G = [Ix(i, j); Iy(i, j)] * [Ix(i, j), Iy(i, j)];
+            tensor(i, j, :, :) = G / (norm(G) + 1e-6); 
+        end
+    end
+end
